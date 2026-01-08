@@ -2,38 +2,40 @@
 
 **A Virtual CPU by APRK**
 
-A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Features a live graphical dashboard, mouse support, and network capabilities.
+A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Features **Multi-Core SMP**, a **Mini GUI OS**, **Snake Game**, mouse support, and network capabilities.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Language](https://img.shields.io/badge/language-C%2B%2B20-orange)
-![Graphics](https://img.shields.io/badge/graphics-SDL2%20%2B%20ImGui-red)
+![Cores](https://img.shields.io/badge/cores-2%20(SMP)-purple)
 
 ## Features
 
-### Core
-- **Native ARM64 Virtualization** - Uses Apple Hypervisor Framework (~0.2-1.0 MIPS)
-- **GIC Interrupt Controller** - Timer interrupts, IRQ handling
-- **VirtIO Block Device** - Disk read/write support
+### Multi-Core SMP ⚡
+- **2 vCPUs** running in parallel
+- Core 0: Main GUI and app logic
+- Core 1: Background tasks (visible counter in About window)
 
-### Graphics & Input
-- **SDL2 Graphics Window** - 320x200 framebuffer @ 60 FPS
-- **Mouse Support** - Real-time cursor tracking with click detection
-- **Keyboard Input** - Direct forwarding to VCPU UART
+### Mini GUI OS 🖥️
+- **Draggable Windows** with title bars and close buttons
+- **Taskbar** with app switching
+- **Mouse Cursor** that follows your pointer
 
-### Network
-- **Network Device** - Ping and HTTP fetch capabilities
-- **Kernel can ping** `8.8.8.8` and display results
+### Snake Game 🐍
+- Classic arcade game running on the VCPU
+- WASD to move, eat food to grow
+- SPACE to restart after game over
 
-### Debug Dashboard
-- **ImGui System Monitor** - Apple-style minimalist UI
-- **Live Disassembly** - ARM64 instruction decode via Capstone
-- **Register View** - Real-time X0-X30 + PC monitoring
+### Other Features
+- SDL2 Graphics (320x200 @ 60fps)
+- Network Device (ping, HTTP fetch)
+- VirtIO Block Storage
+- ImGui Debug Dashboard
+- Live ARM64 Disassembly
 
 ## Requirements
 
-- macOS 11.0+ (Big Sur or later)
-- Apple Silicon Mac (M1/M2/M3/M4/M5)
+- macOS 11.0+ (Apple Silicon)
 - Xcode Command Line Tools
 
 ## Dependencies
@@ -56,21 +58,21 @@ cd VCPU-AR1
 mkdir -p build && cd build
 cmake .. && make
 
-# Create Disk
-echo "Hello from AR1!" > disk.img
-
 # Run
 ./ar1_vcpu ../kernel.bin
 ```
 
 ## Controls
 
-| Input | Action |
-|-------|--------|
-| **Mouse** | Move over VCPU screen to see cursor |
-| **Click** | Cursor changes color (green = clicked) |
-| **Keyboard** | Type into calculator prompt |
-| **ESC** | Quit |
+| Control | Action |
+|---------|--------|
+| **Mouse** | Move cursor, click windows |
+| **Drag Title Bar** | Move windows |
+| **Click Taskbar** | Switch apps (Calc, About, Snake) |
+| **WASD** (in Snake) | Move snake |
+| **SPACE** (in Snake) | Restart game |
+| **Q** (in Snake) | Exit to desktop |
+| **ESC** | Quit VCPU |
 
 ## Memory Map
 
@@ -83,51 +85,50 @@ echo "Hello from AR1!" > disk.img
 | `0x0D000000` | Network |
 | `0x40000000` | RAM (64MB) |
 
-## Kernel Demo
-
-On boot, the kernel:
-1. Draws colored rectangles and gradient bar
-2. **Pings 8.8.8.8** and displays result
-3. Shows a mouse cursor that follows your pointer
-4. Provides a calculator (type `5+3` and press Enter)
-
 ## Architecture
 
 ```
 VCPU-AR1/
 ├── src/
-│   ├── cpu/              # HVF wrapper, registers
+│   ├── cpu/core.cpp      # HVF wrapper, multi-core support
 │   ├── device/
-│   │   ├── display.cpp   # SDL2 + ImGui + Mouse capture
-│   │   ├── mouse.h       # Mouse MMIO device
-│   │   ├── network.h     # Network (ping/fetch) device
-│   │   └── framebuffer.cpp
-│   └── main.cpp
+│   │   ├── display.cpp   # SDL2 + ImGui + Mouse
+│   │   ├── mouse.h       # Mouse MMIO
+│   │   └── network.h     # Network device
+│   └── main.cpp          # SMP thread management
 ├── os/
-│   └── kernel.c          # Bare-metal kernel
+│   └── kernel.c          # GUI OS, Snake, multi-core
 └── include/
 ```
 
 ## Changelog
 
-### v2.2.0 (Latest)
-- ✅ **Mouse Support** - Cursor tracking and click detection
-- ✅ **Network Device** - Ping and HTTP fetch
-- ✅ Non-blocking UART for smooth mouse updates
+### v2.3.0 (Latest) 🎉
+- ✅ **Multi-Core SMP** - 2 vCPUs running in parallel!
+- ✅ **Snake Game** - Classic arcade game
+- ✅ **Mini GUI OS** - Draggable windows, taskbar, app switching
+- ✅ Window title shows core count
+
+### v2.2.0
+- Mouse support with cursor tracking
+- Network device (ping/fetch)
+- Non-blocking UART
 
 ### v2.1.0
-- ImGui "System Monitor" dashboard
-- Live ARM64 disassembly via Capstone
-- Apple-style minimalist UI theme
+- ImGui debug dashboard
+- Live ARM64 disassembly
+- Apple-style UI theme
 
 ### v2.0.0
 - SDL2 graphics window
-- Real-time performance stats
-- Keyboard input forwarding
+- Keyboard input
+- Real-time stats
 
-### v1.0.0
-- Initial release
-- HVF virtualization, VirtIO, GIC, Timer
+## Screenshots
+
+The VCPU window shows:
+- **Left**: VCPU framebuffer with GUI OS
+- **Right**: ImGui System Monitor with live disassembly
 
 ## License
 
@@ -135,4 +136,4 @@ MIT License - see [LICENSE](LICENSE)
 
 ---
 
-**AR1 VCPU by APRK**
+**AR1 VCPU by APRK** - A true virtual computer! 🖥️

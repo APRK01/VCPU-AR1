@@ -4,7 +4,6 @@
 #include "soc/loader.h"
 #include <atomic>
 #include <chrono>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -18,33 +17,35 @@ namespace ar1 {
 extern void uart_push(char c);
 }
 
-const int NUM_CORES = 1;
+const int NUM_CORES = 2; // Multi-core SMP!
 
 // Global Control
 std::atomic<bool> system_running(true);
-std::atomic<bool> core_paused(false); // Start running immediately with SDL
+std::atomic<bool> core_paused(false);
+
 std::vector<std::unique_ptr<Core>> cores;
-std::shared_ptr<ar1::Bus> g_bus;
-std::unique_ptr<ar1::Display> g_display;
+std::shared_ptr<Bus> g_bus;
+std::unique_ptr<Display> g_display;
 std::chrono::steady_clock::time_point start_time;
 
 void print_banner() {
-  std::cout << "\n";
-  std::cout << "  █████╗ ██████╗  ██╗    ██╗   ██╗ ██████╗██████╗ ██╗   ██╗\n";
-  std::cout << " ██╔══██╗██╔══██╗███║    ██║   ██║██╔════╝██╔══██╗██║   ██║\n";
-  std::cout << " ███████║██████╔╝╚██║    ██║   ██║██║     ██████╔╝██║   ██║\n";
-  std::cout << " ██╔══██║██╔══██╗ ██║    ╚██╗ ██╔╝██║     ██╔═══╝ ██║   ██║\n";
-  std::cout << " ██║  ██║██║  ██║ ██║     ╚████╔╝ ╚██████╗██║     ╚██████╔╝\n";
-  std::cout << " ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═╝      ╚═══╝   ╚═════╝╚═╝      ╚═════╝ \n";
-  std::cout << "                        by APRK                           \n";
-  std::cout << "\n";
+  std::cout << R"(
+    _    ____  _  __     _______ _   _ 
+   / \  |  _ \/ | \ \   / / ____| | | |
+  / _ \ | |_) | |  \ \ / / |    | |_| |
+ / ___ \|  _ <| |   \ V /| |    |  _  |
+/_/   \_\_| \_\_|    \_/ |______|_| |_|
+                                       
+           AR1 Virtual CPU
+)" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
   print_banner();
 
-  std::cout << "[AR1] ARM64 Virtual CPU with SDL2 Graphics" << std::endl;
-  std::cout << "[AR1] Press ESC to quit, keys go to VCPU" << std::endl;
+  std::cout << "[AR1] ARM64 Virtual CPU - " << NUM_CORES << " Cores"
+            << std::endl;
+  std::cout << "[AR1] Press ESC to quit" << std::endl;
   std::cout << std::endl;
 
   if (argc < 2) {
@@ -54,7 +55,7 @@ int main(int argc, char *argv[]) {
   std::string binary_path = argv[1];
 
   // Initialize SDL Display
-  g_display = std::make_unique<ar1::Display>(3); // 3x scale
+  g_display = std::make_unique<ar1::Display>(3);
   if (!g_display->init()) {
     std::cerr << "[AR1] Failed to initialize display, running headless"
               << std::endl;
@@ -67,40 +68,46 @@ int main(int argc, char *argv[]) {
   cores.resize(NUM_CORES);
   std::atomic<int> init_count(0);
 
-  // CPU Thread
-  std::thread cpu_thread([&]() {
-    cores[0] = std::make_unique<Core>(g_bus, 0);
-    init_count++;
+  // Load binary first
+  if (!Loader::load_binary(binary_path, RAM_BASE, g_bus.get())) {
+    std::cerr << "[AR1] Load failed." << std::endl;
+    return 1;
+  }
 
-    if (!Loader::load_binary(binary_path, RAM_BASE, g_bus.get())) {
-      std::cerr << "[AR1] Load failed." << std::endl;
-      system_running = false;
-      return;
-    }
+  // Spawn CPU threads for each core
+  std::vector<std::thread> cpu_threads;
 
-    cores[0]->reset(RAM_BASE);
-    std::cout << "[AR1] CPU Running..." << std::endl;
+  for (int i = 0; i < NUM_CORES; i++) {
+    cpu_threads.emplace_back([i, &init_count]() {
+      cores[i] = std::make_unique<Core>(g_bus, i);
+      cores[i]->reset(RAM_BASE);
 
-    while (system_running) {
-      if (!core_paused) {
-        cores[0]->run(
-            50000); // More instructions per batch for better performance
-      } else {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::cout << "[AR1] Core " << i << " started" << std::endl;
+      init_count++;
+
+      while (system_running) {
+        if (!core_paused) {
+          cores[i]->run(50000);
+        } else {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
       }
-    }
-  });
 
-  // Wait for CPU init
+      std::cout << "[AR1] Core " << i << " stopped" << std::endl;
+    });
+  }
+
+  // Wait for all cores to init
   while (init_count < NUM_CORES && system_running)
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+  std::cout << "[AR1] All " << NUM_CORES << " cores running!" << std::endl;
 
   // Main loop - Display & Input
   auto last_stats_time = std::chrono::steady_clock::now();
 
   while (system_running) {
     if (g_display) {
-      // Handle SDL events (keyboard, quit)
       g_display->handle_events();
 
       if (g_display->should_quit()) {
@@ -135,38 +142,28 @@ int main(int argc, char *argv[]) {
                           now - start_time)
                           .count();
         double mips = (double)total_instr / (uptime / 1000.0) / 1000000.0;
-        g_display->show_stats(total_instr, mips, uptime);
+
+        std::stringstream ss;
+        ss << "AR1 VCPU [" << NUM_CORES << " cores] | " << std::fixed
+           << std::setprecision(2) << mips << " MIPS";
+        g_display->set_title(ss.str());
+
         last_stats_time = now;
       }
     } else {
-      // Headless mode - just sleep
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
-    // ~60 FPS
-    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS
   }
 
-  std::cout << "\n[AR1] Shutting down..." << std::endl;
-
-  // Final stats
-  u64 total_instr = 0;
-  for (auto &c : cores) {
-    if (c)
-      total_instr += c->instructions_executed;
-  }
-  auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
-                    std::chrono::steady_clock::now() - start_time)
-                    .count();
-
-  std::cout << "[AR1] Total instructions: " << total_instr << std::endl;
-  if (uptime > 0) {
-    std::cout << "[AR1] Average MIPS: " << std::fixed << std::setprecision(2)
-              << (double)total_instr / uptime / 1000000.0 << std::endl;
+  // Shutdown
+  system_running = false;
+  for (auto &t : cpu_threads) {
+    if (t.joinable())
+      t.join();
   }
 
-  cpu_thread.join();
-
-  std::cout << "[AR1] Goodbye!" << std::endl;
+  std::cout << "[AR1] Shutdown complete." << std::endl;
   return 0;
 }
