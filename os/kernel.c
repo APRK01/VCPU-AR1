@@ -68,6 +68,16 @@ void print_dec(long long val) {
 #define VIRTIO_QUEUE_DEVICE_LOW (*((volatile u32 *)(VIRTIO_BASE + 0x0A0)))
 #define VIRTIO_QUEUE_DEVICE_HIGH (*((volatile u32 *)(VIRTIO_BASE + 0x0A4)))
 
+// Framebuffer
+#define FB_BASE 0x0B000000
+#define FB_WIDTH (*((volatile u32 *)(FB_BASE + 0x00)))
+#define FB_HEIGHT (*((volatile u32 *)(FB_BASE + 0x04)))
+#define FB_ENABLED (*((volatile u32 *)(FB_BASE + 0x0C)))
+#define FB_FLUSH (*((volatile u32 *)(FB_BASE + 0x10)))
+#define FB_PIXEL (*((volatile u32 *)(FB_BASE + 0x14)))
+#define FB_COLOR (*((volatile u32 *)(FB_BASE + 0x18)))
+#define FB_FILL (*((volatile u32 *)(FB_BASE + 0x1C)))
+
 // VirtIO Structures in memory
 #define RING_SIZE 128
 
@@ -132,6 +142,29 @@ void timer_init() {
   ARM_SYSREG_WRITE(cntv_tval_el0, freq / 10);
   ARM_SYSREG_WRITE(cntv_ctl_el0, 1);
 }
+
+// Framebuffer Graphics
+void fb_init() {
+  FB_ENABLED = 1;
+  uart_puts("[FB] Enabled\n");
+}
+
+void fb_set_pixel(u32 x, u32 y, u32 color) {
+  FB_PIXEL = (x << 16) | (y & 0xFFFF);
+  FB_COLOR = color;
+}
+
+void fb_fill(u32 color) { FB_FILL = color; }
+
+void fb_draw_rect(u32 x, u32 y, u32 w, u32 h, u32 color) {
+  for (u32 dy = 0; dy < h; dy++) {
+    for (u32 dx = 0; dx < w; dx++) {
+      fb_set_pixel(x + dx, y + dy, color);
+    }
+  }
+}
+
+void fb_flush() { FB_FLUSH = 1; }
 
 void virtio_init() {
   if (VIRTIO_MAGIC_VALUE != 0x74726976) {
@@ -278,7 +311,11 @@ void kernel_main() {
       asm volatile("wfi");
   }
 
-  uart_puts("\n[VCPU] Init GIC...\n");
+  uart_puts("\n========================================\n");
+  uart_puts("         AR1 VCPU by APRK\n");
+  uart_puts("========================================\n\n");
+
+  uart_puts("[VCPU] Init GIC...\n");
   gic_init();
   uart_puts("[VCPU] Init Timer...\n");
   timer_init();
@@ -287,10 +324,49 @@ void kernel_main() {
   virtio_init();
   virtio_read_sector(0);
 
+  uart_puts("[VCPU] Init Framebuffer...\n");
+  fb_init();
+
+  // Graphics Demo - Draw colorful pattern
+  uart_puts("[VCPU] Drawing graphics demo...\n");
+
+  // Fill screen with dark blue
+  fb_fill(0x00102030);
+
+  // Draw some colored rectangles
+  fb_draw_rect(20, 20, 60, 40, 0x00FF0000);  // Red
+  fb_draw_rect(100, 30, 60, 40, 0x0000FF00); // Green
+  fb_draw_rect(180, 40, 60, 40, 0x000000FF); // Blue
+  fb_draw_rect(260, 50, 40, 30, 0x00FFFF00); // Yellow
+
+  // Draw a gradient bar at bottom
+  for (u32 x = 0; x < 320; x++) {
+    u32 r = x & 0xFF;
+    u32 g = (320 - x) & 0xFF;
+    u32 b = 128;
+    u32 color = r | (g << 8) | (b << 16);
+    for (u32 y = 180; y < 200; y++) {
+      fb_set_pixel(x, y, color);
+    }
+  }
+
+  // Draw border
+  for (u32 x = 0; x < 320; x++) {
+    fb_set_pixel(x, 0, 0x00FFFFFF);
+    fb_set_pixel(x, 199, 0x00FFFFFF);
+  }
+  for (u32 y = 0; y < 200; y++) {
+    fb_set_pixel(0, y, 0x00FFFFFF);
+    fb_set_pixel(319, y, 0x00FFFFFF);
+  }
+
+  fb_flush();
+  uart_puts("[VCPU] Graphics demo complete!\n");
+
   // Unmask IRQ
   asm volatile("msr daifclr, #2");
 
-  uart_puts("[VCPU] Calculator Ready (with Ticks).\n> ");
+  uart_puts("\n[VCPU] Calculator Ready. Enter expression (e.g. 5+3):\n> ");
 
   char buf[64];
   int idx = 0;

@@ -28,6 +28,7 @@ set(SOURCES
     src/soc/loader.cpp
     src/soc/gic.cpp
     src/device/virtio_blk.cpp
+    src/device/framebuffer.cpp
 )
 
 # Executable

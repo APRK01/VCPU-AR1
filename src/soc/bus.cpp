@@ -9,6 +9,8 @@ Bus::Bus() {
   gic = std::make_shared<GIC>();
   virtio_blk = std::make_shared<VirtIOBlock>("disk.img");
   virtio_blk->set_ram(ram->get_raw_ptr());
+  framebuffer = std::make_shared<Framebuffer>();
+  framebuffer->set_ram(ram->get_raw_ptr());
 }
 
 u8 Bus::read8(u64 addr) {
@@ -46,6 +48,9 @@ u32 Bus::read32(u64 addr) {
   }
   if (addr >= VIRTIO_BASE && addr < VIRTIO_BASE + 0x200) {
     return virtio_blk->read(addr - VIRTIO_BASE);
+  }
+  if (addr >= FB_BASE && addr < FB_BASE + 0x100) {
+    return framebuffer->read(addr - FB_BASE);
   }
   return 0;
 }
@@ -87,6 +92,8 @@ void Bus::write32(u64 addr, u32 value) {
     gic->write_cpu(addr - GIC_CPU_BASE, value);
   } else if (addr >= VIRTIO_BASE && addr < VIRTIO_BASE + 0x200) {
     virtio_blk->write(addr - VIRTIO_BASE, value);
+  } else if (addr >= FB_BASE && addr < FB_BASE + 0x100) {
+    framebuffer->write(addr - FB_BASE, value);
   }
 }
 

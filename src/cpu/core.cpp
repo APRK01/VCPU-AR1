@@ -1,7 +1,6 @@
 #include "cpu/core.h"
 #include "cpu/cache.h"
 #include "cpu/predictor.h"
-#include "soc/gic.h"
 #include <cstring>
 #include <deque>
 #include <iostream>
@@ -175,6 +174,9 @@ u64 Core::handle_mmio_read(u64 addr, u32 size) {
     } else if (addr >= 0x0A000000 && addr < 0x0A000200) {
       if (size == 4)
         value = bus->read32(addr);
+    } else if (addr >= 0x0B000000 && addr < 0x0B000100) {
+      if (size == 4)
+        value = bus->read32(addr);
     }
   }
   return value;
@@ -193,6 +195,9 @@ void Core::handle_mmio_write(u64 addr, u32 size, u64 value) {
       if (size == 4)
         bus->write32(addr, (u32)value);
     } else if (addr >= 0x0A000000 && addr < 0x0A000200) {
+      if (size == 4)
+        bus->write32(addr, (u32)value);
+    } else if (addr >= 0x0B000000 && addr < 0x0B000100) {
       if (size == 4)
         bus->write32(addr, (u32)value);
     }
@@ -301,6 +306,7 @@ void Core::run(size_t count) {
       return;
     }
     handle_exit();
+    instructions_executed++;
 
     if (bus->gic->is_irq_pending()) {
       hv_vcpu_set_pending_interrupt(vcpu, HV_INTERRUPT_TYPE_IRQ, true);

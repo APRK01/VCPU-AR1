@@ -35,6 +35,7 @@ public:
   Registers regs;
   u32 core_id;
   bool halted;
+  u64 instructions_executed = 0;
 
   std::unique_ptr<ICache> icache;
   std::unique_ptr<BranchPredictor> predictor;
