@@ -2,21 +2,22 @@
 
 **A Virtual CPU by APRK**
 
-A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework.
+A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework with **SDL2 graphics**.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Language](https://img.shields.io/badge/language-C%2B%2B17-orange)
+![Language](https://img.shields.io/badge/language-C%2B%2B20-orange)
+![Graphics](https://img.shields.io/badge/graphics-SDL2-red)
 
 ## Features
 
 - **Native ARM64 Virtualization** - Uses Apple Hypervisor Framework for near-native performance
+- **SDL2 Graphics Window** - Real-time 320x200 framebuffer display at 60 FPS
+- **Keyboard Input** - Keys are forwarded directly to the VCPU
+- **Live Performance Stats** - Real-time MIPS, instruction count, and FPS in window title
 - **Interrupt Support** - GIC (Generic Interrupt Controller) with timer interrupts
 - **VirtIO Storage** - VirtIO block device for disk I/O
-- **Framebuffer Graphics** - 320x200 framebuffer with drawing primitives
 - **UART Console** - Serial I/O for text-based interaction
-- **Interactive Shell** - Debug and control the VCPU at runtime
-- **Performance Monitoring** - Real-time MIPS/IPS statistics
 - **Bare-Metal Kernel** - Includes a demo kernel with graphics, calculator, and more
 
 ## Requirements
@@ -25,6 +26,7 @@ A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hype
 - Apple Silicon Mac (M1/M2/M3/M4/M5)
 - Xcode Command Line Tools
 - CMake 3.16+
+- SDL2 (`brew install sdl2`)
 
 ## Quick Start
 
@@ -34,6 +36,9 @@ A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hype
 # Clone the repository
 git clone https://github.com/APRK01/VCPU-AR1.git
 cd VCPU-AR1
+
+# Install SDL2 (if not already installed)
+brew install sdl2
 
 # Build the kernel
 ./build_os.sh
@@ -53,31 +58,11 @@ echo "Hello from AR1!" > disk.img
 ./build/ar1_vcpu kernel.bin
 ```
 
-You'll see the AR1 interactive shell. Type `run` to start the VCPU:
+A graphics window will open showing the VCPU output. The window title shows real-time performance stats.
 
-```
-===========================================
-        AR1 INTERACTIVE SHELL             
-===========================================
-System Initialized. Cores Paused. type 'help' for commands.
-> run
-
-========================================
-         AR1 VCPU by APRK
-========================================
-
-[VCPU] Init GIC...
-[VCPU] Init Timer...
-[VCPU] Init VirtIO...
-VirtIO: Init Done.
-[VCPU] Init Framebuffer...
-[FB] Enabled
-[VCPU] Drawing graphics demo...
-[VCPU] Graphics demo complete!
-
-[VCPU] Calculator Ready. Enter expression (e.g. 5+3):
-> 
-```
+**Controls:**
+- **Keyboard**: Keys are sent directly to the VCPU
+- **ESC**: Quit the emulator
 
 ## Architecture
 
@@ -92,8 +77,9 @@ VCPU-AR1/
 │   │   └── uart.cpp      # Serial I/O
 │   ├── device/           # Virtual devices
 │   │   ├── virtio_blk.cpp    # VirtIO block storage
-│   │   └── framebuffer.cpp   # 320x200 Framebuffer
-│   └── main.cpp          # Entry point & shell
+│   │   ├── framebuffer.cpp   # 320x200 Framebuffer
+│   │   └── display.cpp       # SDL2 Graphics Window
+│   └── main.cpp          # Entry point & main loop
 ├── os/                   # Bare-metal kernel
 │   ├── start.s           # Boot assembly
 │   ├── kernel.c          # Kernel C code
@@ -114,39 +100,35 @@ VCPU-AR1/
 | `0x40000000` | 64MB | RAM |
 | `0xC0000000` | 8MB | VRAM |
 
-## Shell Commands
-
-| Command | Description |
-|---------|-------------|
-| `run` | Resume VCPU execution |
-| `stop` | Pause VCPU execution |
-| `regs` | Display CPU registers |
-| `mem <addr>` | Dump memory at hex address |
-| `perf` | Show performance statistics (MIPS, IPS) |
-| `fb` | Save framebuffer to `fb_output.ppm` |
-| `help` | Show available commands |
-| `exit` | Exit emulator |
-
 ## Demo Kernel
 
 The included kernel demonstrates:
-- **Graphics** - Draws colorful rectangles and gradient bars
-- **Timer Interrupts** - Prints `!` on each tick
+- **Live Graphics** - Draws colorful rectangles and gradient bars
+- **Timer Interrupts** - Periodic timer ticks
 - **VirtIO Disk Read** - Reads sector 0 from disk.img
 - **Calculator** - Enter expressions like `5+3`, `10*2`, etc.
 
 ## Performance
 
-The VCPU achieves approximately **0.2-0.3 MIPS** on Apple Silicon, running at near-native speeds thanks to hardware-accelerated virtualization.
+The VCPU achieves approximately **0.2-0.3 MIPS** on Apple Silicon with:
+- **~60 FPS** display refresh rate
+- Hardware-accelerated virtualization via Apple HVF
 
-Use the `perf` command to see real-time stats:
+Window title shows real-time stats:
 ```
-=== Performance Stats ===
-Uptime: 15 seconds
-Instructions: 3414605
-IPS: 227640
-MIPS: 0.23
-=========================
+AR1 VCPU | 0.23 MIPS | 1606758 instr | 7s | FPS: 57
+```
+
+## Dependencies
+
+| Library | Purpose |
+|---------|---------|
+| **SDL2** | Graphics window, keyboard input |
+| **Hypervisor.framework** | ARM64 virtualization |
+
+Install SDL2:
+```bash
+brew install sdl2
 ```
 
 ## License
@@ -158,14 +140,16 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - Apple Hypervisor Framework documentation
 - VirtIO specification
 - ARM Architecture Reference Manual
+- SDL2 library
 
 ## Roadmap
 
-- [x] Framebuffer/Graphics support
-- [x] Performance monitoring
+- [x] SDL2 Graphics Window
+- [x] Real-time Performance Monitoring
+- [x] Keyboard Input
 - [ ] VirtIO Network device
 - [ ] Multi-core (SMP) support
-- [ ] Simple filesystem
+- [ ] Audio support
 - [ ] Interactive games
 
 ---

@@ -12,8 +12,9 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 # Include directories
 include_directories(include)
 
-# Graphics/UI removed for Headless Performance Mode
-add_definitions(-DHEADLESS_MODE)
+# Find SDL2
+find_package(SDL2 REQUIRED)
+include_directories(${SDL2_INCLUDE_DIRS})
 
 # Source files
 set(SOURCES
@@ -29,16 +30,19 @@ set(SOURCES
     src/soc/gic.cpp
     src/device/virtio_blk.cpp
     src/device/framebuffer.cpp
+    src/device/display.cpp
 )
 
 # Executable
 add_executable(ar1_vcpu ${SOURCES})
 
-# Link frameworks
+# Link frameworks and SDL2
 target_link_libraries(ar1_vcpu 
     "-framework Hypervisor" 
     "-framework CoreFoundation"
+    ${SDL2_LIBRARIES}
 )
+
 # Sign with entitlements after build
 add_custom_command(TARGET ar1_vcpu POST_BUILD
     COMMAND codesign --entitlements ${CMAKE_SOURCE_DIR}/ar1.entitlements --force -s - $<TARGET_FILE:ar1_vcpu>

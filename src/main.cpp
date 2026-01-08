@@ -1,8 +1,10 @@
 #include "cpu/core.h"
+#include "device/display.h"
 #include "soc/bus.h"
 #include "soc/loader.h"
-#include "soc/ram.h"
 #include <atomic>
+#include <chrono>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -20,26 +22,30 @@ const int NUM_CORES = 1;
 
 // Global Control
 std::atomic<bool> system_running(true);
-std::atomic<bool> core_paused(true); // Start paused
+std::atomic<bool> core_paused(false); // Start running immediately with SDL
 std::vector<std::unique_ptr<Core>> cores;
 std::shared_ptr<ar1::Bus> g_bus;
+std::unique_ptr<ar1::Display> g_display;
 std::chrono::steady_clock::time_point start_time;
 
-void print_help() {
-  std::cout << "Commands:\n"
-            << "  run       - Resume execution\n"
-            << "  stop      - Pause execution\n"
-            << "  regs      - Dump registers (when paused)\n"
-            << "  mem <addr>- Dump 16 bytes at hex addr\n"
-            << "  perf      - Show performance stats\n"
-            << "  fb        - Save framebuffer to fb_output.ppm\n"
-            << "  exit      - Quit\n";
+void print_banner() {
+  std::cout << "\n";
+  std::cout << "  █████╗ ██████╗  ██╗    ██╗   ██╗ ██████╗██████╗ ██╗   ██╗\n";
+  std::cout << " ██╔══██╗██╔══██╗███║    ██║   ██║██╔════╝██╔══██╗██║   ██║\n";
+  std::cout << " ███████║██████╔╝╚██║    ██║   ██║██║     ██████╔╝██║   ██║\n";
+  std::cout << " ██╔══██║██╔══██╗ ██║    ╚██╗ ██╔╝██║     ██╔═══╝ ██║   ██║\n";
+  std::cout << " ██║  ██║██║  ██║ ██║     ╚████╔╝ ╚██████╗██║     ╚██████╔╝\n";
+  std::cout << " ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═╝      ╚═══╝   ╚═════╝╚═╝      ╚═════╝ \n";
+  std::cout << "                        by APRK                           \n";
+  std::cout << "\n";
 }
 
 int main(int argc, char *argv[]) {
-  std::cout << "===========================================" << std::endl;
-  std::cout << "        AR1 INTERACTIVE SHELL             " << std::endl;
-  std::cout << "===========================================" << std::endl;
+  print_banner();
+
+  std::cout << "[AR1] ARM64 Virtual CPU with SDL2 Graphics" << std::endl;
+  std::cout << "[AR1] Press ESC to quit, keys go to VCPU" << std::endl;
+  std::cout << std::endl;
 
   if (argc < 2) {
     std::cerr << "Usage: ./ar1_vcpu <binary_image>" << std::endl;
@@ -47,146 +53,120 @@ int main(int argc, char *argv[]) {
   }
   std::string binary_path = argv[1];
 
+  // Initialize SDL Display
+  g_display = std::make_unique<ar1::Display>(3); // 3x scale
+  if (!g_display->init()) {
+    std::cerr << "[AR1] Failed to initialize display, running headless"
+              << std::endl;
+    g_display.reset();
+  }
+
   g_bus = std::make_shared<ar1::Bus>();
   start_time = std::chrono::steady_clock::now();
 
   cores.resize(NUM_CORES);
-  std::vector<std::thread> threads;
   std::atomic<int> init_count(0);
 
-  for (int i = 0; i < NUM_CORES; i++) {
-    threads.emplace_back([&, i]() {
-      // Create Core
-      cores[i] = std::make_unique<Core>(g_bus, i);
-      init_count++;
+  // CPU Thread
+  std::thread cpu_thread([&]() {
+    cores[0] = std::make_unique<Core>(g_bus, 0);
+    init_count++;
 
-      // Core 0 loads binary
-      if (i == 0) {
-        if (!Loader::load_binary(binary_path, RAM_BASE, g_bus.get())) {
-          std::cerr << "Load failed." << std::endl;
-          system_running = false;
-        }
+    if (!Loader::load_binary(binary_path, RAM_BASE, g_bus.get())) {
+      std::cerr << "[AR1] Load failed." << std::endl;
+      system_running = false;
+      return;
+    }
+
+    cores[0]->reset(RAM_BASE);
+    std::cout << "[AR1] CPU Running..." << std::endl;
+
+    while (system_running) {
+      if (!core_paused) {
+        cores[0]->run(
+            50000); // More instructions per batch for better performance
+      } else {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
       }
+    }
+  });
 
-      while (init_count < NUM_CORES)
-        std::this_thread::yield(); // Barrier
-
-      // Reset
-      if (system_running)
-        cores[i]->reset(RAM_BASE);
-
-      // Loop
-      while (system_running) {
-        if (!core_paused) {
-          cores[i]->run(10000);
-        } else {
-          std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-      }
-    });
-  }
-
-  // Wait for init
+  // Wait for CPU init
   while (init_count < NUM_CORES && system_running)
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-  std::cout << "System Initialized. Cores Paused. type 'help' for commands."
-            << std::endl;
+  // Main loop - Display & Input
+  auto last_stats_time = std::chrono::steady_clock::now();
 
-  std::string line;
-  while (system_running && std::getline(std::cin, line)) {
-    std::stringstream ss(line);
-    std::string cmd;
-    ss >> cmd;
+  while (system_running) {
+    if (g_display) {
+      // Handle SDL events (keyboard, quit)
+      g_display->handle_events();
 
-    if (cmd == "run") {
-      core_paused = false;
-      std::cout << "Resuming..." << std::endl;
-    } else if (cmd == "stop") {
-      core_paused = true;
-      std::cout << "Paused." << std::endl;
-    } else if (cmd == "regs" || cmd == "reg") {
-      if (!core_paused)
-        std::cout << "Pause first!" << std::endl;
-      else {
-        for (auto &c : cores)
-          if (c)
-            c->dump_regs();
+      if (g_display->should_quit()) {
+        system_running = false;
+        break;
       }
-    } else if (cmd == "mem") {
-      std::string addr_str;
-      ss >> addr_str;
-      try {
-        u64 addr = std::stoull(addr_str, nullptr, 16);
-        std::cout << "Mem [" << std::hex << addr << "]: ";
-        for (int k = 0; k < 16; k++) {
-          std::cout << std::setw(2) << std::setfill('0')
-                    << (int)g_bus->ram->read8(addr + k - RAM_BASE) << " ";
+
+      // Forward keyboard to UART
+      while (g_display->has_key_event()) {
+        char c = g_display->get_key();
+        if (c != 0) {
+          ar1::uart_push(c);
         }
-        std::cout << std::dec << std::endl;
-      } catch (...) {
-        std::cout << "Invalid Addr" << std::endl;
       }
-    } else if (cmd == "type") {
-      std::string input;
-      std::getline(ss, input);
-      // input contains leading space from 'type '
-      for (char c : input) {
-        if (c == ' ')
-          continue; // Skip first space?
-        ar1::uart_push(c);
-      }
-      ar1::uart_push('\n'); // Enter
-      std::cout << "Sent." << std::endl;
-    } else if (cmd == "perf") {
-      // Performance stats
+
+      // Update display with framebuffer
+      g_display->update(g_bus->framebuffer.get());
+
+      // Update stats every second
       auto now = std::chrono::steady_clock::now();
-      auto elapsed =
-          std::chrono::duration_cast<std::chrono::seconds>(now - start_time)
+      auto stats_elapsed =
+          std::chrono::duration_cast<std::chrono::milliseconds>(now -
+                                                                last_stats_time)
               .count();
-      u64 total_instr = 0;
-      for (auto &c : cores) {
-        if (c)
-          total_instr += c->instructions_executed;
-      }
-      std::cout << "\n=== Performance Stats ===" << std::endl;
-      std::cout << "Uptime: " << elapsed << " seconds" << std::endl;
-      std::cout << "Instructions: " << total_instr << std::endl;
-      if (elapsed > 0) {
-        std::cout << "IPS: " << (total_instr / elapsed) << std::endl;
-        std::cout << "MIPS: " << std::fixed << std::setprecision(2)
-                  << (double)total_instr / elapsed / 1000000.0 << std::endl;
-      }
-      std::cout << "=========================" << std::endl;
-    } else if (cmd == "fb") {
-      // Save framebuffer to PPM
-      auto fb = g_bus->framebuffer;
-      std::ofstream file("fb_output.ppm", std::ios::binary);
-      if (file) {
-        file << "P6\n"
-             << fb->get_width() << " " << fb->get_height() << "\n255\n";
-        u8 *buf = fb->get_buffer();
-        for (u32 y = 0; y < fb->get_height(); y++) {
-          for (u32 x = 0; x < fb->get_width(); x++) {
-            u32 idx = (y * fb->get_width() + x) * 4;
-            file.put(buf[idx + 0]); // R
-            file.put(buf[idx + 1]); // G
-            file.put(buf[idx + 2]); // B
-          }
+      if (stats_elapsed >= 1000) {
+        u64 total_instr = 0;
+        for (auto &c : cores) {
+          if (c)
+            total_instr += c->instructions_executed;
         }
-        file.close();
-        std::cout << "Saved framebuffer to fb_output.ppm" << std::endl;
-      } else {
-        std::cout << "Failed to save framebuffer" << std::endl;
+        auto uptime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          now - start_time)
+                          .count();
+        double mips = (double)total_instr / (uptime / 1000.0) / 1000000.0;
+        g_display->show_stats(total_instr, mips, uptime);
+        last_stats_time = now;
       }
-    } else if (cmd == "exit") {
-      system_running = false;
-    } else if (cmd == "help") {
-      print_help();
+    } else {
+      // Headless mode - just sleep
+      std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
+
+    // ~60 FPS
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
-  for (auto &t : threads)
-    t.join(); // or detach
+  std::cout << "\n[AR1] Shutting down..." << std::endl;
+
+  // Final stats
+  u64 total_instr = 0;
+  for (auto &c : cores) {
+    if (c)
+      total_instr += c->instructions_executed;
+  }
+  auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - start_time)
+                    .count();
+
+  std::cout << "[AR1] Total instructions: " << total_instr << std::endl;
+  if (uptime > 0) {
+    std::cout << "[AR1] Average MIPS: " << std::fixed << std::setprecision(2)
+              << (double)total_instr / uptime / 1000000.0 << std::endl;
+  }
+
+  cpu_thread.join();
+
+  std::cout << "[AR1] Goodbye!" << std::endl;
   return 0;
 }
