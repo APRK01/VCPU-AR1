@@ -11,6 +11,8 @@ Bus::Bus() {
   virtio_blk->set_ram(ram->get_raw_ptr());
   framebuffer = std::make_shared<Framebuffer>();
   framebuffer->set_ram(ram->get_raw_ptr());
+  mouse = std::make_shared<Mouse>();
+  network = std::make_shared<Network>();
 }
 
 u8 Bus::read8(u64 addr) {
@@ -51,6 +53,14 @@ u32 Bus::read32(u64 addr) {
   }
   if (addr >= FB_BASE && addr < FB_BASE + 0x100) {
     return framebuffer->read(addr - FB_BASE);
+  }
+  // Mouse MMIO
+  if (addr >= MOUSE_BASE_ADDR && addr < MOUSE_BASE_ADDR + 0x20) {
+    return mouse->read(addr - MOUSE_BASE_ADDR);
+  }
+  // Network MMIO
+  if (addr >= NET_BASE_ADDR && addr < NET_BASE_ADDR + 0x20) {
+    return network->read(addr - NET_BASE_ADDR);
   }
   return 0;
 }
@@ -94,6 +104,10 @@ void Bus::write32(u64 addr, u32 value) {
     virtio_blk->write(addr - VIRTIO_BASE, value);
   } else if (addr >= FB_BASE && addr < FB_BASE + 0x100) {
     framebuffer->write(addr - FB_BASE, value);
+  } else if (addr >= MOUSE_BASE_ADDR && addr < MOUSE_BASE_ADDR + 0x20) {
+    mouse->write(addr - MOUSE_BASE_ADDR, value);
+  } else if (addr >= NET_BASE_ADDR && addr < NET_BASE_ADDR + 0x20) {
+    network->write(addr - NET_BASE_ADDR, value);
   }
 }
 

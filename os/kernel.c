@@ -20,6 +20,14 @@ char uart_getc() {
   return (char)(UART_DR & 0xFF);
 }
 
+// Non-blocking version - returns 0 if no char available
+char uart_trygetc() {
+  if (UART_FR & 0x10) {
+    return 0; // No data available
+  }
+  return (char)(UART_DR & 0xFF);
+}
+
 void print_dec(long long val) {
   char buf[32];
   int i = 0;
@@ -77,6 +85,30 @@ void print_dec(long long val) {
 #define FB_PIXEL (*((volatile u32 *)(FB_BASE + 0x14)))
 #define FB_COLOR (*((volatile u32 *)(FB_BASE + 0x18)))
 #define FB_FILL (*((volatile u32 *)(FB_BASE + 0x1C)))
+
+// Mouse Device
+#define MOUSE_BASE 0x0C000000
+#define MOUSE_X (*((volatile u32 *)(MOUSE_BASE + 0x00)))
+#define MOUSE_Y (*((volatile u32 *)(MOUSE_BASE + 0x04)))
+#define MOUSE_BUTTONS (*((volatile u32 *)(MOUSE_BASE + 0x08)))
+#define MOUSE_PRESENT (*((volatile u32 *)(MOUSE_BASE + 0x0C)))
+
+// Network Device
+#define NET_BASE 0x0D000000
+#define NET_STATUS (*((volatile u32 *)(NET_BASE + 0x00)))
+#define NET_CMD (*((volatile u32 *)(NET_BASE + 0x04)))
+#define NET_DATA_LEN (*((volatile u32 *)(NET_BASE + 0x08)))
+#define NET_TX_CHAR (*((volatile u32 *)(NET_BASE + 0x0C)))
+#define NET_RX_CHAR (*((volatile u32 *)(NET_BASE + 0x10)))
+#define NET_CLEAR (*((volatile u32 *)(NET_BASE + 0x14)))
+
+#define NET_IDLE 0
+#define NET_BUSY 1
+#define NET_DONE 2
+#define NET_ERROR 3
+
+#define NET_CMD_PING 1
+#define NET_CMD_FETCH 2
 
 // VirtIO Structures in memory
 #define RING_SIZE 128
@@ -363,28 +395,85 @@ void kernel_main() {
   fb_flush();
   uart_puts("[VCPU] Graphics demo complete!\n");
 
+  // Network Test - Ping Google DNS
+  uart_puts("[VCPU] Testing Network - Pinging 8.8.8.8...\n");
+  NET_CLEAR = 1;
+  const char *host = "8.8.8.8";
+  for (int i = 0; host[i]; i++) {
+    NET_TX_CHAR = host[i];
+  }
+  NET_CMD = NET_CMD_PING;
+
+  // Wait for result
+  while (NET_STATUS == NET_BUSY) {
+    for (volatile int i = 0; i < 10000; i++)
+      ;
+  }
+
+  if (NET_STATUS == NET_DONE) {
+    uart_puts("[NET] Ping result:\n");
+    u32 len = NET_DATA_LEN;
+    for (u32 i = 0; i < len && i < 200; i++) {
+      char c = (char)NET_RX_CHAR;
+      uart_putc(c);
+    }
+    uart_puts("\n");
+  } else {
+    uart_puts("[NET] Ping failed!\n");
+  }
+
   // Unmask IRQ
   asm volatile("msr daifclr, #2");
 
-  uart_puts("\n[VCPU] Calculator Ready. Enter expression (e.g. 5+3):\n> ");
+  uart_puts("\n[VCPU] Mouse + Calculator Ready!\n");
+  uart_puts("Move mouse over VCPU screen. Enter expressions:\n> ");
 
   char buf[64];
   int idx = 0;
+  u32 last_mx = 0, last_my = 0;
+  u32 cursor_color = 0x00FF00FF; // Magenta cursor
 
   while (1) {
-    char c = uart_getc();
-    uart_putc(c);
+    // Draw mouse cursor
+    if (MOUSE_PRESENT) {
+      u32 mx = MOUSE_X;
+      u32 my = MOUSE_Y;
 
-    if (c == '\n' || c == '\r') {
-      buf[idx] = 0;
-      long long res = eval(buf);
-      uart_puts("\nResult: ");
-      print_dec(res);
-      uart_puts("\n> ");
-      idx = 0;
-    } else {
-      if (idx < 63)
-        buf[idx++] = c;
+      // Erase old cursor (draw background color)
+      if (last_mx != mx || last_my != my) {
+        // Simple: just redraw a small region
+        fb_draw_rect(last_mx, last_my, 8, 8, 0x00102030);
+      }
+
+      // Draw new cursor (simple 8x8 block)
+      if (MOUSE_BUTTONS & 1) {
+        cursor_color = 0x0000FF00; // Green when clicking
+      } else {
+        cursor_color = 0x00FF00FF; // Magenta
+      }
+      fb_draw_rect(mx, my, 8, 8, cursor_color);
+      fb_flush();
+
+      last_mx = mx;
+      last_my = my;
+    }
+
+    // Handle keyboard (non-blocking)
+    char c = uart_trygetc();
+    if (c != 0) {
+      uart_putc(c);
+
+      if (c == '\n' || c == '\r') {
+        buf[idx] = 0;
+        long long res = eval(buf);
+        uart_puts("\nResult: ");
+        print_dec(res);
+        uart_puts("\n> ");
+        idx = 0;
+      } else {
+        if (idx < 63)
+          buf[idx++] = c;
+      }
     }
   }
 }

@@ -2,7 +2,7 @@
 
 **A Virtual CPU by APRK**
 
-A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Featuring a **live graphical dashboard**, real-time disassembly, and SDL2 graphics.
+A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Features a live graphical dashboard, mouse support, and network capabilities.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -11,28 +11,30 @@ A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hype
 
 ## Features
 
-- **Native ARM64 Virtualization** - Uses Apple Framework for near-native performance (~0.2-0.3 MIPS).
-- **Pro Dashboard** - Live system monitor overlay using Dear ImGui:
-  - **Live Disassembly** using Capstone engine (watch instructions execute!)
-  - **Register View** (Real-time X0-X30 monitoring)
-  - **VCPU Status**
-- **SDL2 Graphics Window** - 320x200 framebuffer with 3x scaling (960x600 window).
-- **Keyboard Input** - Forwarded directly to the VCPU over UART.
-- **VirtIO Storage** - Block device support.
-- **Bare-Metal Kernel** - Includes a demo with graphics and calculator.
+### Core
+- **Native ARM64 Virtualization** - Uses Apple Hypervisor Framework (~0.2-1.0 MIPS)
+- **GIC Interrupt Controller** - Timer interrupts, IRQ handling
+- **VirtIO Block Device** - Disk read/write support
 
-## Screen & Dashboard
+### Graphics & Input
+- **SDL2 Graphics Window** - 320x200 framebuffer @ 60 FPS
+- **Mouse Support** - Real-time cursor tracking with click detection
+- **Keyboard Input** - Direct forwarding to VCPU UART
 
-The emulator opens a single window with two sections:
-1.  **VCPU Display**: Shows the 320x200 framebuffer output (colored graphics).
-2.  **System Monitor**: A "Glass Cockpit" showing what the CPU is actually doing.
+### Network
+- **Network Device** - Ping and HTTP fetch capabilities
+- **Kernel can ping** `8.8.8.8` and display results
+
+### Debug Dashboard
+- **ImGui System Monitor** - Apple-style minimalist UI
+- **Live Disassembly** - ARM64 instruction decode via Capstone
+- **Register View** - Real-time X0-X30 + PC monitoring
 
 ## Requirements
 
 - macOS 11.0+ (Big Sur or later)
 - Apple Silicon Mac (M1/M2/M3/M4/M5)
 - Xcode Command Line Tools
-- Homebrew
 
 ## Dependencies
 
@@ -42,8 +44,6 @@ brew install sdl2 capstone
 
 ## Quick Start
 
-### Build
-
 ```bash
 # Clone
 git clone https://github.com/APRK01/VCPU-AR1.git
@@ -52,51 +52,86 @@ cd VCPU-AR1
 # Build Kernel
 ./build_os.sh
 
-# Build Emulator
+# Build VCPU
 mkdir -p build && cd build
-cmake ..
-make
+cmake .. && make
 
 # Create Disk
 echo "Hello from AR1!" > disk.img
-```
 
-### Run
-
-```bash
-./build/ar1_vcpu kernel.bin
+# Run
+./ar1_vcpu ../kernel.bin
 ```
 
 ## Controls
 
-- **Keyboard**: Type into the VCPU UART console.
-- **ESC**: Quit the emulator.
+| Input | Action |
+|-------|--------|
+| **Mouse** | Move over VCPU screen to see cursor |
+| **Click** | Cursor changes color (green = clicked) |
+| **Keyboard** | Type into calculator prompt |
+| **ESC** | Quit |
+
+## Memory Map
+
+| Address | Device |
+|---------|--------|
+| `0x09000000` | UART |
+| `0x0A000000` | VirtIO Block |
+| `0x0B000000` | Framebuffer |
+| `0x0C000000` | Mouse |
+| `0x0D000000` | Network |
+| `0x40000000` | RAM (64MB) |
+
+## Kernel Demo
+
+On boot, the kernel:
+1. Draws colored rectangles and gradient bar
+2. **Pings 8.8.8.8** and displays result
+3. Shows a mouse cursor that follows your pointer
+4. Provides a calculator (type `5+3` and press Enter)
 
 ## Architecture
 
 ```
 VCPU-AR1/
 ├── src/
-│   ├── cpu/              # Core logic & HVF wrapper
+│   ├── cpu/              # HVF wrapper, registers
 │   ├── device/
-│   │   ├── display.cpp   # SDL2 + ImGui Dashboard Implementation
+│   │   ├── display.cpp   # SDL2 + ImGui + Mouse capture
+│   │   ├── mouse.h       # Mouse MMIO device
+│   │   ├── network.h     # Network (ping/fetch) device
 │   │   └── framebuffer.cpp
-│   ├── vendor/           # ImGui source code
-│   └── main.cpp          # Entry point
-├── os/                   # Bare-metal kernel code
-└── build_os.sh
+│   └── main.cpp
+├── os/
+│   └── kernel.c          # Bare-metal kernel
+└── include/
 ```
 
-## Performance
+## Changelog
 
-The dashboard shows real-time stats in the window title:
-```
-AR1 VCPU | 0.95 MIPS
-```
+### v2.2.0 (Latest)
+- ✅ **Mouse Support** - Cursor tracking and click detection
+- ✅ **Network Device** - Ping and HTTP fetch
+- ✅ Non-blocking UART for smooth mouse updates
+
+### v2.1.0
+- ImGui "System Monitor" dashboard
+- Live ARM64 disassembly via Capstone
+- Apple-style minimalist UI theme
+
+### v2.0.0
+- SDL2 graphics window
+- Real-time performance stats
+- Keyboard input forwarding
+
+### v1.0.0
+- Initial release
+- HVF virtualization, VirtIO, GIC, Timer
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE)
 
 ---
 

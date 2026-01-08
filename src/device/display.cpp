@@ -207,6 +207,32 @@ void Display::draw_debug_overlay(Core *core, Bus *bus) {
 }
 
 void Display::update(Framebuffer *fb, Core *core, Bus *bus) {
+  // Capture mouse state and forward to VCPU
+  int mx, my;
+  u32 buttons = SDL_GetMouseState(&mx, &my);
+
+  // Check if mouse is in VCPU screen area (not ImGui panel)
+  if (mx >= 20 && mx < 20 + width * scale && my >= 20 &&
+      my < 20 + height * scale) {
+    // Translate to VCPU coordinates (0-319, 0-199)
+    i32 vcpu_x = (mx - 20) / scale;
+    i32 vcpu_y = (my - 20) / scale;
+
+    bus->mouse->set_position(vcpu_x, vcpu_y);
+    bus->mouse->set_present(true);
+
+    u32 button_state = 0;
+    if (buttons & SDL_BUTTON(SDL_BUTTON_LEFT))
+      button_state |= 1;
+    if (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT))
+      button_state |= 2;
+    if (buttons & SDL_BUTTON(SDL_BUTTON_MIDDLE))
+      button_state |= 4;
+    bus->mouse->set_buttons(button_state);
+  } else {
+    bus->mouse->set_present(false);
+  }
+
   // Start ImGui frame
   ImGui_ImplSDLRenderer2_NewFrame();
   ImGui_ImplSDL2_NewFrame();

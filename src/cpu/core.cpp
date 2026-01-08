@@ -177,6 +177,12 @@ u64 Core::handle_mmio_read(u64 addr, u32 size) {
     } else if (addr >= 0x0B000000 && addr < 0x0B000100) {
       if (size == 4)
         value = bus->read32(addr);
+    } else if (addr >= 0x0C000000 && addr < 0x0C000020) { // Mouse
+      if (size == 4)
+        value = bus->read32(addr);
+    } else if (addr >= 0x0D000000 && addr < 0x0D000020) { // Network
+      if (size == 4)
+        value = bus->read32(addr);
     }
   }
   return value;
@@ -198,6 +204,12 @@ void Core::handle_mmio_write(u64 addr, u32 size, u64 value) {
       if (size == 4)
         bus->write32(addr, (u32)value);
     } else if (addr >= 0x0B000000 && addr < 0x0B000100) {
+      if (size == 4)
+        bus->write32(addr, (u32)value);
+    } else if (addr >= 0x0C000000 && addr < 0x0C000020) { // Mouse
+      if (size == 4)
+        bus->write32(addr, (u32)value);
+    } else if (addr >= 0x0D000000 && addr < 0x0D000020) { // Network
       if (size == 4)
         bus->write32(addr, (u32)value);
     }
