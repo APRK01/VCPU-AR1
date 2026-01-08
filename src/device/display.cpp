@@ -135,71 +135,79 @@ bool Display::init() {
 }
 
 void Display::draw_debug_overlay(Core *core, Bus *bus) {
-  // Disassembly Window
-  ImGui::SetNextWindowPos(ImVec2(width * scale + 20, 20),
-                          ImGuiCond_FirstUseEver); // Add padding
-  ImGui::SetNextWindowSize(ImVec2(450, height * scale - 40),
-                           ImGuiCond_FirstUseEver); // Wider
+  // Position next to VCPU screen
+  ImGui::SetNextWindowPos(ImVec2(width * scale + 40, 20),
+                          ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(380, height * scale - 40),
+                           ImGuiCond_FirstUseEver);
 
   ImGui::Begin("System Monitor", nullptr, ImGuiWindowFlags_NoCollapse);
 
-  ImGui::TextDisabled("VCPU State: RUNNING");
+  // Status
+  ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "VCPU Status: RUNNING");
+  ImGui::Text("Instructions: %llu", core->instructions_executed);
   ImGui::Separator();
 
+  // Registers - show fewer for less clutter
   if (ImGui::CollapsingHeader("Registers", ImGuiTreeNodeFlags_DefaultOpen)) {
-    if (ImGui::BeginTable("regs", 2, ImGuiTableFlags_RowBg)) {
-      for (int i = 0; i < 31; i++) {
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.4f, 1.0f), "X%d", i);
-        ImGui::TableSetColumnIndex(1);
-        ImGui::Text("0x%016llX", core->regs.x[i]);
-      }
-      ImGui::TableNextRow();
-      ImGui::TableSetColumnIndex(0);
-      ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "PC");
-      ImGui::TableSetColumnIndex(1);
-      ImGui::Text("0x%016llX", core->regs.pc);
+    ImGui::Columns(2, "reg_cols");
+    ImGui::SetColumnWidth(0, 60);
 
-      ImGui::EndTable();
+    // Show key registers
+    ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "PC");
+    ImGui::NextColumn();
+    ImGui::Text("0x%08llX", core->regs.pc);
+    ImGui::NextColumn();
+
+    ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.8f, 1.0f), "SP");
+    ImGui::NextColumn();
+    ImGui::Text("0x%08llX", core->regs.x[31]);
+    ImGui::NextColumn();
+
+    for (int i = 0; i < 8; i++) {
+      ImGui::TextDisabled("X%d", i);
+      ImGui::NextColumn();
+      ImGui::Text("0x%08llX", core->regs.x[i]);
+      ImGui::NextColumn();
     }
+
+    ImGui::Columns(1);
   }
 
   ImGui::Separator();
 
+  // Disassembly
   if (ImGui::CollapsingHeader("Disassembly", ImGuiTreeNodeFlags_DefaultOpen)) {
     u64 pc = core->get_pc();
-    // Read memory around PC
-    const int INSTR_COUNT = 8;
+    const int INSTR_COUNT = 6;
     u8 code[INSTR_COUNT * 4];
-    u64 base_pc = pc;
 
-    // Read instructions from bus
     for (int i = 0; i < INSTR_COUNT * 4; i++) {
-      // Safe read byte-by-byte for now (unoptimized)
-      code[i] = bus->ram->read8(base_pc + i - RAM_BASE);
+      code[i] = bus->ram->read8(pc + i - RAM_BASE);
     }
 
     if (capstone_ready) {
       cs_insn *insn;
       size_t count =
-          cs_disasm(capstone_handle, code, sizeof(code), base_pc, 0, &insn);
+          cs_disasm(capstone_handle, code, sizeof(code), pc, 0, &insn);
       if (count > 0) {
-        for (size_t j = 0; j < count; j++) {
+        for (size_t j = 0; j < count && j < 6; j++) {
           bool is_current = (insn[j].address == pc);
           if (is_current) {
-            ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f),
-                               "-> %08llX:  %s  %s", insn[j].address,
+            ImGui::TextColored(ImVec4(0.0f, 0.7f, 1.0f, 1.0f),
+                               "> %04llX: %s %s", insn[j].address & 0xFFFF,
                                insn[j].mnemonic, insn[j].op_str);
           } else {
-            ImGui::Text("%08llX:  %s  %s", insn[j].address, insn[j].mnemonic,
-                        insn[j].op_str);
+            ImGui::Text("  %04llX: %s %s", insn[j].address & 0xFFFF,
+                        insn[j].mnemonic, insn[j].op_str);
           }
         }
         cs_free(insn, count);
       } else {
-        ImGui::Text("Failed to disassemble");
+        ImGui::Text("(disassembly unavailable)");
       }
+    } else {
+      ImGui::Text("Capstone not loaded");
     }
   }
 

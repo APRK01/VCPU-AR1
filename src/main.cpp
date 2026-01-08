@@ -17,7 +17,7 @@ namespace ar1 {
 extern void uart_push(char c);
 }
 
-const int NUM_CORES = 2; // Multi-core SMP!
+const int NUM_CORES = 1; // Single core for now - SMP requires more work
 
 // Global Control
 std::atomic<bool> system_running(true);

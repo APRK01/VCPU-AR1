@@ -2,40 +2,34 @@
 
 **A Virtual CPU by APRK**
 
-A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Features **Multi-Core SMP**, a **Mini GUI OS**, **Snake Game**, mouse support, and network capabilities.
+A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Features real-time graphics, mouse input, keyboard demo, and a live debug dashboard.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Language](https://img.shields.io/badge/language-C%2B%2B20-orange)
-![Cores](https://img.shields.io/badge/cores-2%20(SMP)-purple)
 
 ## Features
 
-### Multi-Core SMP ⚡
-- **2 vCPUs** running in parallel
-- Core 0: Main GUI and app logic
-- Core 1: Background tasks (visible counter in About window)
+### Graphics & Input
+- **SDL2 Graphics** - 320x200 framebuffer @ 60fps
+- **Mouse Support** - Cursor tracking with click detection
+- **Keyboard Input** - Real-time key capture and display
 
-### Mini GUI OS 🖥️
-- **Draggable Windows** with title bars and close buttons
-- **Taskbar** with app switching
-- **Mouse Cursor** that follows your pointer
+### Devices
+- **UART** - Serial I/O for debugging
+- **Framebuffer** - Pixel-level graphics control
+- **Mouse** - Position and button state
+- **Network** - Ping and HTTP fetch (experimental)
+- **VirtIO Block** - Disk storage
 
-### Snake Game 🐍
-- Classic arcade game running on the VCPU
-- WASD to move, eat food to grow
-- SPACE to restart after game over
-
-### Other Features
-- SDL2 Graphics (320x200 @ 60fps)
-- Network Device (ping, HTTP fetch)
-- VirtIO Block Storage
-- ImGui Debug Dashboard
-- Live ARM64 Disassembly
+### Debug Dashboard
+- **ImGui System Monitor** - Apple-style UI
+- **Live Registers** - X0-X7, PC, SP
+- **ARM64 Disassembly** - Via Capstone
 
 ## Requirements
 
-- macOS 11.0+ (Apple Silicon)
+- macOS 11.0+ (Apple Silicon M1/M2/M3/M4)
 - Xcode Command Line Tools
 
 ## Dependencies
@@ -62,17 +56,20 @@ cmake .. && make
 ./ar1_vcpu ../kernel.bin
 ```
 
-## Controls
+## Current Demo
 
-| Control | Action |
-|---------|--------|
-| **Mouse** | Move cursor, click windows |
-| **Drag Title Bar** | Move windows |
-| **Click Taskbar** | Switch apps (Calc, About, Snake) |
-| **WASD** (in Snake) | Move snake |
-| **SPACE** (in Snake) | Restart game |
-| **Q** (in Snake) | Exit to desktop |
-| **ESC** | Quit VCPU |
+The keyboard demo shows:
+- **7-Segment Counter** - Shows how many characters typed
+- **Visual Blocks** - Last 10 typed characters
+- **Blinking Cursor** - Shows input position
+- **Status Bar** - System status
+
+### Controls
+| Key | Action |
+|-----|--------|
+| Any key | Type character |
+| Backspace | Delete last |
+| ESC | Clear all |
 
 ## Memory Map
 
@@ -90,50 +87,38 @@ cmake .. && make
 ```
 VCPU-AR1/
 ├── src/
-│   ├── cpu/core.cpp      # HVF wrapper, multi-core support
-│   ├── device/
-│   │   ├── display.cpp   # SDL2 + ImGui + Mouse
-│   │   ├── mouse.h       # Mouse MMIO
-│   │   └── network.h     # Network device
-│   └── main.cpp          # SMP thread management
+│   ├── cpu/          # HVF wrapper, registers
+│   ├── device/       # Display, mouse, network
+│   └── soc/          # Bus, RAM, GIC
 ├── os/
-│   └── kernel.c          # GUI OS, Snake, multi-core
+│   └── kernel.c      # Bare-metal kernel
 └── include/
 ```
 
 ## Changelog
 
-### v2.3.0 (Latest) 🎉
-- ✅ **Multi-Core SMP** - 2 vCPUs running in parallel!
-- ✅ **Snake Game** - Classic arcade game
-- ✅ **Mini GUI OS** - Draggable windows, taskbar, app switching
-- ✅ Window title shows core count
+### v2.4.0 (Current)
+- ✅ Keyboard demo with visual feedback
+- ✅ 7-segment digit display
+- ✅ Character counter and blocks
+
+### v2.3.0
+- Mouse cursor support
+- System Monitor improvements
+- Color format fixes
 
 ### v2.2.0
-- Mouse support with cursor tracking
 - Network device (ping/fetch)
 - Non-blocking UART
 
 ### v2.1.0
 - ImGui debug dashboard
 - Live ARM64 disassembly
-- Apple-style UI theme
-
-### v2.0.0
-- SDL2 graphics window
-- Keyboard input
-- Real-time stats
-
-## Screenshots
-
-The VCPU window shows:
-- **Left**: VCPU framebuffer with GUI OS
-- **Right**: ImGui System Monitor with live disassembly
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT License
 
 ---
 
-**AR1 VCPU by APRK** - A true virtual computer! 🖥️
+**AR1 VCPU by APRK** 🖥️
