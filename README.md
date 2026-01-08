@@ -1,12 +1,14 @@
 # AR1 VCPU
 
-A lightweight ARM64 virtual CPU emulator for Apple Silicon Macs, built using Apple's Hypervisor Framework.
+**A Virtual CPU by APRK**
+
+A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Language](https://img.shields.io/badge/language-C%2B%2B17-orange)
 
-## ✨ Features
+## Features
 
 - **Native ARM64 Virtualization** - Uses Apple Hypervisor Framework for near-native performance
 - **Interrupt Support** - GIC (Generic Interrupt Controller) with timer interrupts
@@ -15,14 +17,14 @@ A lightweight ARM64 virtual CPU emulator for Apple Silicon Macs, built using App
 - **Interactive Shell** - Debug and control the VCPU at runtime
 - **Bare-Metal Kernel** - Includes a simple demo kernel with a calculator
 
-## 📋 Requirements
+## Requirements
 
 - macOS 11.0+ (Big Sur or later)
-- Apple Silicon Mac (M1/M2/M3)
+- Apple Silicon Mac (M1/M2/M3/M4/M5)
 - Xcode Command Line Tools
 - CMake 3.16+
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Build
 
@@ -59,7 +61,7 @@ System Initialized. Cores Paused. type 'help' for commands.
 > run
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ar1-vcpu/
@@ -81,7 +83,7 @@ ar1-vcpu/
 └── build_os.sh       # Kernel build script
 ```
 
-## 💡 Memory Map
+## Memory Map
 
 | Address | Size | Description |
 |---------|------|-------------|
@@ -92,7 +94,7 @@ ar1-vcpu/
 | `0x40000000` | 64MB | RAM |
 | `0x50000000` | 16MB | VRAM (reserved) |
 
-## 🎮 Shell Commands
+## Shell Commands
 
 | Command | Description |
 |---------|-------------|
@@ -104,24 +106,24 @@ ar1-vcpu/
 | `help` | Show available commands |
 | `quit` | Exit emulator |
 
-## 🔧 Demo Kernel
+## Demo Kernel
 
 The included kernel demonstrates:
 - Timer interrupt handling (prints `!` on each tick)
 - VirtIO disk read (reads sector 0 and prints content)
 - Simple calculator (enter expressions like `2+3`)
 
-## 📝 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Apple Hypervisor Framework documentation
 - VirtIO specification
 - ARM Architecture Reference Manual
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] Framebuffer/Graphics support
 - [ ] VirtIO Network device
@@ -131,4 +133,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Built with ❤️ for Apple Silicon**
+**AR1 VCPU by APRK**
