@@ -1,0 +1,34 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Compiled binaries
+*.bin
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE files
+.idea/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+.DS_Store
+
+# Disk images (user-created)
+disk.img
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Logs
+*.log
+
+# Backup files
+*~
+*.bak
+*.swp
