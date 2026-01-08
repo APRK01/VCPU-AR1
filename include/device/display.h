@@ -1,6 +1,6 @@
 #pragma once
 #include "../types.h"
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <atomic>
 #include <mutex>
 #include <string>
