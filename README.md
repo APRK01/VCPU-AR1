@@ -2,53 +2,62 @@
 
 **A Virtual CPU by APRK**
 
-A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework with **SDL2 graphics**.
+A lightweight ARM64 virtual CPU for Apple Silicon Macs, built using Apple's Hypervisor Framework. Featuring a **live graphical dashboard**, real-time disassembly, and SDL2 graphics.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Apple%20Silicon)-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Language](https://img.shields.io/badge/language-C%2B%2B20-orange)
-![Graphics](https://img.shields.io/badge/graphics-SDL2-red)
+![Graphics](https://img.shields.io/badge/graphics-SDL2%20%2B%20ImGui-red)
 
 ## Features
 
-- **Native ARM64 Virtualization** - Uses Apple Hypervisor Framework for near-native performance
-- **SDL2 Graphics Window** - Real-time 320x200 framebuffer display at 60 FPS
-- **Keyboard Input** - Keys are forwarded directly to the VCPU
-- **Live Performance Stats** - Real-time MIPS, instruction count, and FPS in window title
-- **Interrupt Support** - GIC (Generic Interrupt Controller) with timer interrupts
-- **VirtIO Storage** - VirtIO block device for disk I/O
-- **UART Console** - Serial I/O for text-based interaction
-- **Bare-Metal Kernel** - Includes a demo kernel with graphics, calculator, and more
+- **Native ARM64 Virtualization** - Uses Apple Framework for near-native performance (~0.2-0.3 MIPS).
+- **Pro Dashboard** - Live system monitor overlay using Dear ImGui:
+  - **Live Disassembly** using Capstone engine (watch instructions execute!)
+  - **Register View** (Real-time X0-X30 monitoring)
+  - **VCPU Status**
+- **SDL2 Graphics Window** - 320x200 framebuffer with 3x scaling (960x600 window).
+- **Keyboard Input** - Forwarded directly to the VCPU over UART.
+- **VirtIO Storage** - Block device support.
+- **Bare-Metal Kernel** - Includes a demo with graphics and calculator.
+
+## Screen & Dashboard
+
+The emulator opens a single window with two sections:
+1.  **VCPU Display**: Shows the 320x200 framebuffer output (colored graphics).
+2.  **System Monitor**: A "Glass Cockpit" showing what the CPU is actually doing.
 
 ## Requirements
 
 - macOS 11.0+ (Big Sur or later)
 - Apple Silicon Mac (M1/M2/M3/M4/M5)
 - Xcode Command Line Tools
-- CMake 3.16+
-- SDL2 (`brew install sdl2`)
+- Homebrew
+
+## Dependencies
+
+```bash
+brew install sdl2 capstone
+```
 
 ## Quick Start
 
 ### Build
 
 ```bash
-# Clone the repository
+# Clone
 git clone https://github.com/APRK01/VCPU-AR1.git
 cd VCPU-AR1
 
-# Install SDL2 (if not already installed)
-brew install sdl2
-
-# Build the kernel
+# Build Kernel
 ./build_os.sh
 
-# Build the emulator
+# Build Emulator
 mkdir -p build && cd build
 cmake ..
 make
 
-# Create a test disk image (optional)
+# Create Disk
 echo "Hello from AR1!" > disk.img
 ```
 
@@ -58,99 +67,36 @@ echo "Hello from AR1!" > disk.img
 ./build/ar1_vcpu kernel.bin
 ```
 
-A graphics window will open showing the VCPU output. The window title shows real-time performance stats.
+## Controls
 
-**Controls:**
-- **Keyboard**: Keys are sent directly to the VCPU
-- **ESC**: Quit the emulator
+- **Keyboard**: Type into the VCPU UART console.
+- **ESC**: Quit the emulator.
 
 ## Architecture
 
 ```
 VCPU-AR1/
 ├── src/
-│   ├── cpu/              # VCPU core (HVF integration)
-│   ├── soc/              # System-on-Chip components
-│   │   ├── bus.cpp       # Memory bus & MMIO routing
-│   │   ├── gic.cpp       # Interrupt controller
-│   │   ├── ram.cpp       # RAM management
-│   │   └── uart.cpp      # Serial I/O
-│   ├── device/           # Virtual devices
-│   │   ├── virtio_blk.cpp    # VirtIO block storage
-│   │   ├── framebuffer.cpp   # 320x200 Framebuffer
-│   │   └── display.cpp       # SDL2 Graphics Window
-│   └── main.cpp          # Entry point & main loop
-├── os/                   # Bare-metal kernel
-│   ├── start.s           # Boot assembly
-│   ├── kernel.c          # Kernel C code
-│   └── linker.ld         # Linker script
-├── include/              # Headers
-└── build_os.sh           # Kernel build script
+│   ├── cpu/              # Core logic & HVF wrapper
+│   ├── device/
+│   │   ├── display.cpp   # SDL2 + ImGui Dashboard Implementation
+│   │   └── framebuffer.cpp
+│   ├── vendor/           # ImGui source code
+│   └── main.cpp          # Entry point
+├── os/                   # Bare-metal kernel code
+└── build_os.sh
 ```
-
-## Memory Map
-
-| Address | Size | Description |
-|---------|------|-------------|
-| `0x09000000` | 4KB | UART (PL011-compatible) |
-| `0x0A000000` | 512B | VirtIO Block Device |
-| `0x0B000000` | 256B | Framebuffer MMIO |
-| `0x08000000` | 64KB | GIC Distributor |
-| `0x08100000` | 8KB | GIC CPU Interface |
-| `0x40000000` | 64MB | RAM |
-| `0xC0000000` | 8MB | VRAM |
-
-## Demo Kernel
-
-The included kernel demonstrates:
-- **Live Graphics** - Draws colorful rectangles and gradient bars
-- **Timer Interrupts** - Periodic timer ticks
-- **VirtIO Disk Read** - Reads sector 0 from disk.img
-- **Calculator** - Enter expressions like `5+3`, `10*2`, etc.
 
 ## Performance
 
-The VCPU achieves approximately **0.2-0.3 MIPS** on Apple Silicon with:
-- **~60 FPS** display refresh rate
-- Hardware-accelerated virtualization via Apple HVF
-
-Window title shows real-time stats:
+The dashboard shows real-time stats in the window title:
 ```
-AR1 VCPU | 0.23 MIPS | 1606758 instr | 7s | FPS: 57
-```
-
-## Dependencies
-
-| Library | Purpose |
-|---------|---------|
-| **SDL2** | Graphics window, keyboard input |
-| **Hypervisor.framework** | ARM64 virtualization |
-
-Install SDL2:
-```bash
-brew install sdl2
+AR1 VCPU | 0.95 MIPS
 ```
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Apple Hypervisor Framework documentation
-- VirtIO specification
-- ARM Architecture Reference Manual
-- SDL2 library
-
-## Roadmap
-
-- [x] SDL2 Graphics Window
-- [x] Real-time Performance Monitoring
-- [x] Keyboard Input
-- [ ] VirtIO Network device
-- [ ] Multi-core (SMP) support
-- [ ] Audio support
-- [ ] Interactive games
 
 ---
 

@@ -7,6 +7,10 @@
 
 namespace ar1 {
 
+#include <capstone/capstone.h>
+
+class Core;
+class Bus;
 class Framebuffer;
 
 class Display {
@@ -15,7 +19,7 @@ public:
   ~Display();
 
   bool init();
-  void update(Framebuffer *fb);
+  void update(Framebuffer *fb, Core *core, Bus *bus);
   void handle_events();
   void show_stats(u64 instructions, double mips, u64 uptime_ms);
 
@@ -30,6 +34,10 @@ private:
   SDL_Renderer *renderer = nullptr;
   SDL_Texture *texture = nullptr;
 
+  // Disassembly
+  csh capstone_handle;
+  bool capstone_ready = false;
+
   int scale;
   int width = 320;
   int height = 200;
@@ -40,6 +48,9 @@ private:
 
   u64 last_instructions = 0;
   u64 frame_count = 0;
+
+  void apply_theme();
+  void draw_debug_overlay(Core *core, Bus *bus);
 };
 
 } // namespace ar1

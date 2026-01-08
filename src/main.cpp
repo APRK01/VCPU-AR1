@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
       }
 
       // Update display with framebuffer
-      g_display->update(g_bus->framebuffer.get());
+      g_display->update(g_bus->framebuffer.get(), cores[0].get(), g_bus.get());
 
       // Update stats every second
       auto now = std::chrono::steady_clock::now();
